@@ -2,20 +2,20 @@ import React, { useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useStore } from '@/data/store';
-import {
-  addMonths, formatShortDate, leadingBlanks, MONTH_NAMES, weekdayLetters, yearMonthOf, monthKeys,
-} from '@/domain/dates';
-import {
-  completionRate, currentStreak, isCompleted, isScheduledOn, longestStreak, totalCompletions,
-} from '@/domain/habits';
+import { addMonths, leadingBlanks, monthKeys, yearMonthOf } from '@/domain/dates';
+import { completionRate, currentStreak, isCompleted, isScheduledOn, longestStreak, totalCompletions } from '@/domain/habits';
 import { HeatGrid, type HeatDay } from '@/components/charts';
 import { HabitIcon, describeSchedule, describeTarget } from '@/components/habit';
 import { Banner, Button, Card, IconButton, Muted, Row, Screen, ScreenHeader, SectionTitle, Text } from '@/components/ui';
+import { useI18n, useTheme } from '@/settings/SettingsProvider';
 import { lightTap } from '@/services/haptics';
-import { colors, spacing } from '@/theme';
+import { spacing } from '@/theme';
 
 export default function HabitDetailScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const i18n = useI18n();
+  const { t, icon } = i18n;
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, today, index, setCompletion, deleteHabit } = useStore();
   const habit = state.habits.find((h) => h.id === id);
@@ -48,8 +48,8 @@ export default function HabitDetailScreen() {
   if (!habit) {
     return (
       <Screen>
-        <ScreenHeader title="Habit" onBack={close} />
-        <Banner tone="error" message="This habit no longer exists." />
+        <ScreenHeader title={t('habit.title')} onBack={close} />
+        <Banner tone="error" message={t('habitForm.notFound')} />
       </Screen>
     );
   }
@@ -63,6 +63,7 @@ export default function HabitDetailScreen() {
     .filter((c) => c.habitId === habit.id)
     .sort((a, b) => (a.date < b.date ? 1 : -1))
     .slice(0, 7);
+  const target = describeTarget(habit, i18n);
 
   const toggleDay = (key: string) => {
     if (key > today || key < habit.startDate) return;
@@ -71,20 +72,22 @@ export default function HabitDetailScreen() {
   };
 
   const confirmDelete = () =>
-    Alert.alert('Delete habit?', `“${habit.name}” and all of its history will be permanently removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { deleteHabit(habit.id); close(); } },
+    Alert.alert(t('habit.deleteTitle'), t('habit.deleteMsg', { name: habit.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => { deleteHabit(habit.id); close(); } },
     ]);
+
+  const rate = (r: number | null) => (r === null ? '–' : `${Math.round(r * 100)}%`);
 
   return (
     <Screen>
       <ScreenHeader
-        title="Habit"
+        title={t('habit.title')}
         onBack={close}
         right={
           <Row style={{ gap: 0 }}>
-            <IconButton icon="edit-2" label="Edit habit" onPress={() => router.push({ pathname: '/habit/form', params: { id: habit.id } })} />
-            <IconButton icon="trash-2" label="Delete habit" color={colors.danger} onPress={confirmDelete} />
+            <IconButton icon="edit-2" label={t('habit.editA11y')} onPress={() => router.push({ pathname: '/habit/form', params: { id: habit.id } })} />
+            <IconButton icon="trash-2" label={t('habit.deleteA11y')} color={colors.danger} onPress={confirmDelete} />
           </Row>
         }
       />
@@ -94,14 +97,14 @@ export default function HabitDetailScreen() {
         <View style={{ flex: 1, gap: 2 }}>
           <Text variant="title" accessibilityRole="header">{habit.name}</Text>
           <Muted variant="caption">
-            {describeSchedule(habit.schedule, weekStart === 'monday')}{describeTarget(habit) ? ` · ${describeTarget(habit)}` : ''}
+            {describeSchedule(habit.schedule, i18n, weekStart === 'monday')}{target ? ` · ${target}` : ''}
           </Muted>
         </View>
       </Row>
       {habit.description ? <Muted>{habit.description}</Muted> : null}
 
       <Button
-        title={!scheduledToday ? 'Not scheduled today' : doneToday ? 'Completed today — tap to undo' : 'Mark complete today'}
+        title={!scheduledToday ? t('habit.notScheduled') : doneToday ? t('habit.completedUndo') : t('habit.markComplete')}
         icon={doneToday ? 'rotate-ccw' : 'check'}
         variant={doneToday ? 'secondary' : 'primary'}
         disabled={!scheduledToday}
@@ -109,52 +112,53 @@ export default function HabitDetailScreen() {
       />
 
       <Row style={{ gap: spacing.md }}>
-        <Tile label="Current streak" value={`${currentStreak(habit, index, today)}d`} />
-        <Tile label="Longest streak" value={`${longestStreak(habit, index, today)}d`} />
-        <Tile label="Total" value={String(totalCompletions(habit, state.completions))} />
+        <Tile label={t('habit.streakCurrent')} value={t('common.daysShort', { count: currentStreak(habit, index, today) })} />
+        <Tile label={t('habit.streakLongest')} value={t('common.daysShort', { count: longestStreak(habit, index, today) })} />
+        <Tile label={t('habit.total')} value={String(totalCompletions(habit, state.completions))} />
       </Row>
       <Row style={{ gap: spacing.md }}>
-        <Tile label="Last 7 days" value={rate7 === null ? '–' : `${Math.round(rate7 * 100)}%`} />
-        <Tile label="Last 30 days" value={rate30 === null ? '–' : `${Math.round(rate30 * 100)}%`} />
+        <Tile label={t('habit.last7')} value={rate(rate7)} />
+        <Tile label={t('habit.last30')} value={rate(rate30)} />
       </Row>
 
       <View style={{ gap: spacing.sm }}>
-        <SectionTitle title="History" />
+        <SectionTitle title={t('habit.history')} />
         <Card>
           <Row style={{ justifyContent: 'space-between' }}>
-            <IconButton icon="chevron-left" label="Previous month" onPress={() => setOffset((o) => o - 1)} />
-            <Text variant="label">{MONTH_NAMES[month0]} {year}</Text>
-            <IconButton icon="chevron-right" label="Next month" disabled={offset >= 0} onPress={() => setOffset((o) => o + 1)} />
+            <IconButton icon={icon('chevron-left')} label={t('habits.prevMonth')} onPress={() => setOffset((o) => o - 1)} />
+            <Text variant="label" style={{ textAlign: 'center' }}>{i18n.monthYear(year, month0)}</Text>
+            <IconButton icon={icon('chevron-right')} label={t('habits.nextMonth')} disabled={offset >= 0} onPress={() => setOffset((o) => o + 1)} />
           </Row>
-          <HeatGrid cells={cells} weekdayLabels={weekdayLetters(weekStart)} onPressDay={toggleDay} />
-          <Muted variant="caption">{monthDone} completed this month. Tap a past day to correct your record.</Muted>
+          <HeatGrid cells={cells} weekdayLabels={i18n.weekdayLetters(weekStart)} onPressDay={toggleDay} />
+          <Muted variant="caption">{t('habit.historyHint', { count: monthDone })}</Muted>
         </Card>
       </View>
 
       <View style={{ gap: spacing.sm }}>
-        <SectionTitle title="Recent completions" />
+        <SectionTitle title={t('habit.recent')} />
         <Card style={{ gap: spacing.sm }}>
           {recent.length === 0 ? (
-            <Muted>No completions yet. Your first check-in will show up here.</Muted>
+            <Muted>{t('habit.noCompletions')}</Muted>
           ) : (
             recent.map((c) => (
               <Row key={c.id} style={{ justifyContent: 'space-between' }}>
-                <Text>{formatShortDate(c.date)}</Text>
-                <Muted variant="caption">{new Date(c.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Muted>
+                <Text>{i18n.shortDate(c.date)}</Text>
+                <Muted variant="caption">{i18n.clockTime(c.completedAt)}</Muted>
               </Row>
             ))
           )}
         </Card>
       </View>
-      <Muted variant="caption" style={{ textAlign: 'center' }}>Started {formatShortDate(habit.startDate)}</Muted>
+      <Muted variant="caption" style={{ textAlign: 'center' }}>{t('habit.started', { date: i18n.shortDate(habit.startDate) })}</Muted>
     </Screen>
   );
 }
 
 function Tile({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
   return (
     <Card style={{ flex: 1, padding: spacing.md, gap: 2, alignItems: 'center' }}>
-      <Text variant="title" accessibilityLabel={`${label}: ${value}`}>{value}</Text>
+      <Text variant="title" accessibilityLabel={`${label}: ${value}`} style={{ textAlign: 'center' }}>{value}</Text>
       <Text variant="caption" color={colors.textMuted} style={{ textAlign: 'center' }}>{label}</Text>
     </Card>
   );

@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View,
-  type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
+  type StyleProp, type TextInputProps, type TextProps, type ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, gradients, radius, spacing, type } from '@/theme';
+import { useI18n, useTheme } from '@/settings/SettingsProvider';
+import { radius, spacing, type } from '@/theme';
+import { contrastRatio } from '@/theme/palette';
 
 export type IconName = React.ComponentProps<typeof Feather>['name'];
 
@@ -17,11 +19,28 @@ interface AppTextProps extends TextProps {
   variant?: Variant;
   color?: string;
 }
-export function Text({ variant = 'body', color = colors.highlight, style, ...rest }: AppTextProps) {
-  return <RNText {...rest} style={[type[variant], { color }, style]} />;
+export function Text({ variant = 'body', color, style, ...rest }: AppTextProps) {
+  const { colors } = useTheme();
+  const { textAlign, writingDirection } = useI18n();
+  return <RNText {...rest} style={[type[variant], { color: color ?? colors.text, textAlign, writingDirection }, style]} />;
 }
 
-export const Muted = (p: Omit<AppTextProps, 'color'>) => <Text {...p} color={colors.textMuted} />;
+export function Muted({ color: _ignored, ...p }: AppTextProps) {
+  const { colors } = useTheme();
+  return <Text {...p} color={colors.textMuted} />;
+}
+
+/* ---------- Layout helpers ---------- */
+
+export function Row({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const { row } = useI18n();
+  return <View style={[{ flexDirection: row, alignItems: 'center', gap: spacing.md }, style]}>{children}</View>;
+}
+
+export function Wrap({ children }: { children: React.ReactNode }) {
+  const { row } = useI18n();
+  return <View style={{ flexDirection: row, flexWrap: 'wrap', gap: spacing.sm }}>{children}</View>;
+}
 
 /* ---------- Screen ---------- */
 
@@ -34,9 +53,10 @@ interface ScreenProps {
 }
 export function Screen({ children, scroll = true, tabs = false, contentStyle }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const pad = { paddingTop: insets.top + spacing.md, paddingBottom: tabs ? spacing.xl : insets.bottom + spacing.xl };
   return (
-    <LinearGradient colors={gradients.screen} style={styles.flex}>
+    <LinearGradient colors={colors.gradients.screen} style={styles.flex}>
       {scroll ? (
         <ScrollView
           style={styles.flex}
@@ -53,15 +73,14 @@ export function Screen({ children, scroll = true, tabs = false, contentStyle }: 
   );
 }
 
-/** Header for pushed (non-tab) screens. */
+/** Header for pushed (non-tab) screens. The back chevron points the right way in RTL. */
 export function ScreenHeader({ title, onBack, right }: { title: string; onBack?: () => void; right?: React.ReactNode }) {
+  const { t, row, icon } = useI18n();
   return (
-    <View style={styles.headerRow}>
-      {onBack ? <IconButton icon="chevron-left" label="Go back" onPress={onBack} /> : <View style={{ width: 44 }} />}
-      <Text variant="heading" style={styles.flex} numberOfLines={1}>
-        {title}
-      </Text>
-      <View style={styles.headerRight}>{right}</View>
+    <View style={{ flexDirection: row, alignItems: 'center', gap: spacing.sm }}>
+      {onBack ? <IconButton icon={icon('chevron-left')} label={t('common.back')} onPress={onBack} /> : <View style={{ width: 44 }} />}
+      <Text variant="heading" style={styles.flex} numberOfLines={1} accessibilityRole="header">{title}</Text>
+      <View style={{ minWidth: 44, flexDirection: row, justifyContent: 'flex-end' }}>{right}</View>
     </View>
   );
 }
@@ -74,27 +93,38 @@ export function Card({ children, style, onPress, label }: {
   onPress?: () => void;
   label?: string;
 }) {
+  const { colors } = useTheme();
+  const base: ViewStyle = {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+    shadowColor: colors.shadow,
+    shadowOpacity: colors.scheme === 'dark' ? 0.25 : 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: colors.scheme === 'dark' ? 3 : 2,
+  };
   if (onPress) {
     return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        style={({ pressed }) => [styles.card, style, pressed && { opacity: 0.85 }]}
-      >
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => [base, style, pressed && { opacity: 0.85 }]}>
         {children}
       </Pressable>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View style={[base, style]}>{children}</View>;
 }
 
 export function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  const { colors } = useTheme();
+  const { row } = useI18n();
   return (
-    <View style={styles.sectionRow}>
+    <View style={{ flexDirection: row, alignItems: 'center', justifyContent: 'space-between', minHeight: 32 }}>
       <Text variant="heading" accessibilityRole="header">{title}</Text>
       {action && onAction ? (
-        <Pressable onPress={onAction} hitSlop={10} accessibilityRole="button" style={styles.minTap}>
+        <Pressable onPress={onAction} hitSlop={10} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
           <Text variant="label" color={colors.accent}>{action}</Text>
         </Pressable>
       ) : null}
@@ -114,15 +144,21 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 export function Button({ title, onPress, icon, variant = 'primary', disabled, loading, style }: ButtonProps) {
-  const fg = variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.danger : colors.highlight;
+  const { colors } = useTheme();
+  const { row, icon: mirror } = useI18n();
+  const fg = variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.danger : colors.text;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
       accessibilityRole="button"
+      accessibilityLabel={title}
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
       style={({ pressed }) => [
-        styles.button,
+        {
+          minHeight: 52, borderRadius: radius.md, paddingHorizontal: spacing.xl, flexDirection: row,
+          alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+        },
         variant === 'primary' && { backgroundColor: colors.primary },
         variant === 'secondary' && { backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderWidth: 1 },
         variant === 'danger' && { borderColor: colors.danger, borderWidth: 1 },
@@ -131,13 +167,13 @@ export function Button({ title, onPress, icon, variant = 'primary', disabled, lo
         style,
       ]}
     >
-      {loading ? <ActivityIndicator color={fg} /> : icon ? <Feather name={icon} size={18} color={fg} /> : null}
-      <Text variant="label" color={fg} style={{ fontSize: 16 }}>{title}</Text>
+      {loading ? <ActivityIndicator color={fg} /> : icon ? <Feather name={mirror(icon)} size={18} color={fg} /> : null}
+      <Text variant="label" color={fg} style={{ fontSize: 16, textAlign: 'center' }}>{title}</Text>
     </Pressable>
   );
 }
 
-export function IconButton({ icon, label, onPress, color = colors.highlight, filled, disabled }: {
+export function IconButton({ icon, label, onPress, color, filled, disabled }: {
   icon: IconName;
   label: string;
   onPress: () => void;
@@ -145,6 +181,7 @@ export function IconButton({ icon, label, onPress, color = colors.highlight, fil
   filled?: boolean;
   disabled?: boolean;
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -153,13 +190,13 @@ export function IconButton({ icon, label, onPress, color = colors.highlight, fil
       accessibilityLabel={label}
       hitSlop={6}
       style={({ pressed }) => [
-        styles.iconButton,
+        { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
         filled && { backgroundColor: colors.primary },
         disabled && { opacity: 0.4 },
         pressed && { opacity: 0.7 },
       ]}
     >
-      <Feather name={icon} size={22} color={filled ? colors.onPrimary : color} />
+      <Feather name={icon} size={22} color={filled ? colors.onPrimary : color ?? colors.text} />
     </Pressable>
   );
 }
@@ -173,16 +210,22 @@ export function Chip({ label, selected, onPress, icon, disabled }: {
   icon?: IconName;
   disabled?: boolean;
 }) {
+  const { colors } = useTheme();
+  const { row } = useI18n();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected, disabled: !!disabled }}
-      style={[styles.chip, selected && styles.chipSelected, disabled && { opacity: 0.45 }]}
+      style={{
+        minHeight: 40, paddingHorizontal: spacing.lg, borderRadius: radius.pill, flexDirection: row, alignItems: 'center',
+        gap: 6, borderWidth: 1, borderColor: selected ? colors.selected : colors.border,
+        backgroundColor: selected ? colors.selected : colors.surface, opacity: disabled ? 0.45 : 1,
+      }}
     >
-      {icon ? <Feather name={icon} size={15} color={selected ? colors.onPrimary : colors.accent} /> : null}
-      <Text variant="label" color={selected ? colors.onPrimary : colors.highlight}>{label}</Text>
+      {icon ? <Feather name={icon} size={15} color={selected ? colors.onSelected : colors.accent} /> : null}
+      <Text variant="label" color={selected ? colors.onSelected : colors.text}>{label}</Text>
     </Pressable>
   );
 }
@@ -192,8 +235,13 @@ export function Segmented<T extends string>({ options, value, onChange }: {
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { colors } = useTheme();
+  const { row } = useI18n();
   return (
-    <View style={styles.segmented} accessibilityRole="tablist">
+    <View
+      style={{ flexDirection: row, backgroundColor: colors.surface, borderRadius: radius.pill, padding: 4, borderWidth: 1, borderColor: colors.border }}
+      accessibilityRole="tablist"
+    >
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -202,9 +250,9 @@ export function Segmented<T extends string>({ options, value, onChange }: {
             onPress={() => onChange(o.value)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            style={[styles.segment, active && { backgroundColor: colors.primary }]}
+            style={{ flex: 1, minHeight: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? colors.primary : 'transparent' }}
           >
-            <Text variant="label" color={active ? colors.onPrimary : colors.accent}>{o.label}</Text>
+            <Text variant="label" color={active ? colors.onPrimary : colors.textMuted} style={{ textAlign: 'center' }}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -220,39 +268,45 @@ interface FieldProps extends TextInputProps {
   hint?: string;
 }
 export function Field({ label, error, hint, style, ...rest }: FieldProps) {
+  const { colors } = useTheme();
+  const { textAlign, writingDirection } = useI18n();
   return (
     <View style={{ gap: spacing.xs }}>
-      <Text variant="label" color={colors.accent}>{label}</Text>
+      <Text variant="label" color={colors.textMuted}>{label}</Text>
       <TextInput
-        placeholderTextColor="#5C7FA8"
+        placeholderTextColor={colors.placeholder}
         accessibilityLabel={label}
+        selectionColor={colors.primary}
+        keyboardAppearance={colors.scheme}
         {...rest}
-        style={[styles.input, error ? { borderColor: colors.danger } : null, rest.multiline && { minHeight: 76, textAlignVertical: 'top' }, style]}
+        style={[
+          {
+            minHeight: 50, borderRadius: radius.md, borderWidth: 1, borderColor: error ? colors.danger : colors.border,
+            backgroundColor: colors.surface, color: colors.text, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+            fontSize: 16, textAlign, writingDirection,
+          },
+          rest.multiline && { minHeight: 76, textAlignVertical: 'top' },
+          style,
+        ]}
       />
       {error ? <Text variant="caption" color={colors.danger} accessibilityLiveRegion="polite">{error}</Text> : hint ? <Muted variant="caption">{hint}</Muted> : null}
     </View>
   );
 }
 
-export function Row({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }, style]}>{children}</View>;
-}
-
-export function Wrap({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>{children}</View>;
-}
-
 /* ---------- Progress ---------- */
 
-export function ProgressBar({ ratio, color = colors.primary, height = 8 }: { ratio: number; color?: string; height?: number }) {
+export function ProgressBar({ ratio, color, height = 8 }: { ratio: number; color?: string; height?: number }) {
+  const { colors } = useTheme();
+  const { row } = useI18n();
   const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
   return (
     <View
-      style={{ height, borderRadius: height, backgroundColor: 'rgba(125,160,202,0.18)', overflow: 'hidden' }}
+      style={{ height, borderRadius: height, backgroundColor: colors.track, overflow: 'hidden', flexDirection: row }}
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: pct }}
     >
-      <View style={{ width: `${pct}%`, height: '100%', borderRadius: height, backgroundColor: color }} />
+      <View style={{ width: `${pct}%`, height: '100%', borderRadius: height, backgroundColor: color ?? colors.primary }} />
     </View>
   );
 }
@@ -266,10 +320,11 @@ export function EmptyState({ icon, title, message, actionLabel, onAction }: {
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <Card style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xl }}>
-      <View style={styles.emptyIcon}>
-        <Feather name={icon} size={26} color={colors.highlight} />
+      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surfaceRaised, alignItems: 'center', justifyContent: 'center' }}>
+        <Feather name={icon} size={26} color={colors.text} />
       </View>
       <Text variant="heading" style={{ textAlign: 'center' }}>{title}</Text>
       <Muted style={{ textAlign: 'center' }}>{message}</Muted>
@@ -279,9 +334,14 @@ export function EmptyState({ icon, title, message, actionLabel, onAction }: {
 }
 
 export function Banner({ message, tone = 'info' }: { message: string; tone?: 'info' | 'error' }) {
+  const { colors } = useTheme();
+  const { row } = useI18n();
   return (
     <View
-      style={[styles.banner, tone === 'error' && { borderColor: colors.danger }]}
+      style={{
+        flexDirection: row, gap: spacing.sm, alignItems: 'center', padding: spacing.md, borderRadius: radius.md,
+        borderWidth: 1, borderColor: tone === 'error' ? colors.danger : colors.border, backgroundColor: colors.surface,
+      }}
       accessibilityLiveRegion="polite"
     >
       <Feather name={tone === 'error' ? 'alert-circle' : 'info'} size={18} color={tone === 'error' ? colors.danger : colors.accent} />
@@ -296,36 +356,48 @@ export function Toggle({ label, description, value, onChange }: {
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const { colors } = useTheme();
+  const { row } = useI18n();
   return (
     <Pressable
       onPress={() => onChange(!value)}
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
       accessibilityLabel={label}
-      style={[styles.settingRow]}
+      style={{ flexDirection: row, alignItems: 'center', gap: spacing.md, minHeight: 52 }}
     >
       <View style={styles.flex}>
         <Text variant="label">{label}</Text>
         {description ? <Muted variant="caption">{description}</Muted> : null}
       </View>
-      <View style={[styles.switchTrack, value && { backgroundColor: colors.primary }]}>
-        <View style={[styles.switchThumb, value && { alignSelf: 'flex-end', backgroundColor: colors.highlight }]} />
+      <View
+        style={{
+          width: 50, height: 30, borderRadius: 15, padding: 3, flexDirection: row,
+          backgroundColor: value ? colors.primary : colors.track, justifyContent: value ? 'flex-end' : 'flex-start',
+          alignItems: 'center',
+        }}
+      >
+        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: value ? colors.onPrimary : colors.textMuted }} />
       </View>
     </Pressable>
   );
 }
 
 export function Avatar({ name, color, size = 64 }: { name: string; color: string; size?: number }) {
+  const { t } = useI18n();
   const initial = (name.trim()[0] ?? '').toUpperCase();
+  const bg = color;
+  // Choose the ink (dark navy or white) that reads better on the chosen avatar color.
+  const ink = contrastRatio('#021024', bg) >= contrastRatio('#FFFFFF', bg) ? '#021024' : '#FFFFFF';
   return (
     <View
-      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}
-      accessibilityLabel={name ? `Avatar for ${name}` : 'Avatar'}
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityLabel={name ? t('you.avatarA11y', { name }) : t('you.avatarA11yEmpty')}
     >
       {initial ? (
-        <Text style={{ fontSize: size * 0.42, fontWeight: '700' }} color={colors.onPrimary}>{initial}</Text>
+        <RNText style={{ fontSize: size * 0.42, fontWeight: '700', color: ink }}>{initial}</RNText>
       ) : (
-        <Feather name="user" size={size * 0.46} color={colors.onPrimary} />
+        <Feather name="user" size={size * 0.46} color={ink} />
       )}
     </View>
   );
@@ -334,76 +406,4 @@ export function Avatar({ name, color, size = 64 }: { name: string; color: string
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  headerRight: { minWidth: 44, flexDirection: 'row', justifyContent: 'flex-end' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-  },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32 },
-  minTap: { minHeight: 44, justifyContent: 'center' },
-  button: {
-    minHeight: 52,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  iconButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  chip: {
-    minHeight: 40,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: 'rgba(5,38,89,0.6)',
-  },
-  chipSelected: { backgroundColor: colors.highlight, borderColor: colors.highlight },
-  segmented: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  segment: { flex: 1, minHeight: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  input: {
-    minHeight: 50,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    color: colors.highlight,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 16,
-  },
-  emptyIcon: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surfaceRaised,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  banner: {
-    flexDirection: 'row', gap: spacing.sm, alignItems: 'center', padding: spacing.md,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
-  },
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 52 },
-  switchTrack: {
-    width: 50, height: 30, borderRadius: 15, padding: 3, backgroundColor: 'rgba(125,160,202,0.3)', justifyContent: 'center',
-  },
-  switchThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.accent, alignSelf: 'flex-start' },
 });

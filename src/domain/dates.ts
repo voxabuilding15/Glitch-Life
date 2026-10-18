@@ -1,14 +1,8 @@
+import { DURATION_UNITS, MONTHS, MONTHS_SHORT, WEEKDAYS, WEEKDAYS_SHORT, WEEKDAY_LETTERS } from '@/i18n/names';
+import type { Lang } from '@/i18n/types';
 import type { DateKey, Weekday, WeekStart } from './types';
 
 const pad = (n: number) => String(n).padStart(2, '0');
-
-export const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-export const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-export const WEEKDAY_LETTER = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 /** Local date key for a Date, using the device's local calendar day. */
 export function toDateKey(d: Date): DateKey {
@@ -76,33 +70,58 @@ export function addMonths(year: number, month0: number, n: number): { year: numb
   return { year: Math.floor(total / 12), month0: ((total % 12) + 12) % 12 };
 }
 
-export function greetingFor(date: Date): string {
+export type GreetingKey = 'greeting.morning' | 'greeting.afternoon' | 'greeting.evening' | 'greeting.night';
+
+export function greetingKey(date: Date): GreetingKey {
   const h = date.getHours();
-  if (h < 5) return 'Good night';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 5) return 'greeting.night';
+  if (h < 12) return 'greeting.morning';
+  if (h < 18) return 'greeting.afternoon';
+  return 'greeting.evening';
 }
 
-export function formatLongDate(key: DateKey): string {
+export function monthName(month0: number, lang: Lang = 'en'): string {
+  return MONTHS[lang][month0];
+}
+
+export function formatMonthYear(year: number, month0: number, lang: Lang = 'en'): string {
+  return `${MONTHS[lang][month0]} ${year}`;
+}
+
+export function formatLongDate(key: DateKey, lang: Lang = 'en'): string {
   const { year, month0 } = yearMonthOf(key);
   const day = Number(key.slice(8, 10));
-  return `${WEEKDAY_NAMES[weekdayOf(key)]}, ${MONTH_NAMES[month0]} ${day}, ${year}`;
+  const wd = WEEKDAYS[lang][weekdayOf(key)];
+  const month = MONTHS[lang][month0];
+  if (lang === 'en') return `${wd}, ${month} ${day}, ${year}`;
+  return `${wd} ${day} ${month} ${year}`;
 }
 
-export function formatShortDate(key: DateKey): string {
+export function formatShortDate(key: DateKey, lang: Lang = 'en'): string {
   const { month0 } = yearMonthOf(key);
-  return `${MONTH_NAMES[month0].slice(0, 3)} ${Number(key.slice(8, 10))}, ${key.slice(0, 4)}`;
+  const day = Number(key.slice(8, 10));
+  const year = key.slice(0, 4);
+  const month = MONTHS_SHORT[lang][month0];
+  return lang === 'en' ? `${month} ${day}, ${year}` : `${day} ${month} ${year}`;
 }
 
-export function formatDuration(totalSeconds: number): string {
+export function weekdayShort(day: number, lang: Lang = 'en'): string {
+  return WEEKDAYS_SHORT[lang][day];
+}
+
+export function weekdayName(day: number, lang: Lang = 'en'): string {
+  return WEEKDAYS[lang][day];
+}
+
+export function formatDuration(totalSeconds: number, lang: Lang = 'en'): string {
+  const u = DURATION_UNITS[lang];
   const s = Math.max(0, Math.round(totalSeconds));
-  if (s === 0) return '0 min';
+  if (s === 0) return `0 ${u.mAlone}`;
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  if (m > 0) return `${m} min`;
-  return `${s}s`;
+  if (h > 0) return m > 0 ? `${h}${u.h} ${m}${u.m}` : `${h}${u.h}`;
+  if (m > 0) return `${m} ${u.mAlone}`;
+  return `${s}${u.s}`;
 }
 
 export function formatClock(totalSeconds: number): string {
@@ -113,10 +132,17 @@ export function formatClock(totalSeconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 }
 
-export function formatTime(hour: number, minute: number): string {
-  const suffix = hour >= 12 ? 'PM' : 'AM';
+export function formatTime(hour: number, minute: number, lang: Lang = 'en'): string {
+  if (lang === 'fr') return `${pad(hour)}:${pad(minute)}`;
+  const suffix = lang === 'ar' ? (hour >= 12 ? 'م' : 'ص') : hour >= 12 ? 'PM' : 'AM';
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${h12}:${pad(minute)} ${suffix}`;
+}
+
+/** Local wall-clock time of an epoch timestamp, formatted in the app language. */
+export function formatClockTime(epochMs: number, lang: Lang = 'en'): string {
+  const d = new Date(epochMs);
+  return formatTime(d.getHours(), d.getMinutes(), lang);
 }
 
 /** Milliseconds until the next local midnight. */
@@ -132,6 +158,11 @@ export function leadingBlanks(year: number, month0: number, weekStart: WeekStart
   return (firstDow - first + 7) % 7;
 }
 
-export function weekdayLetters(weekStart: WeekStart): string[] {
-  return weekStart === 'monday' ? [...WEEKDAY_LETTER.slice(1), WEEKDAY_LETTER[0]] : WEEKDAY_LETTER;
+export function weekdayLetters(weekStart: WeekStart, lang: Lang = 'en'): string[] {
+  const l = WEEKDAY_LETTERS[lang];
+  return weekStart === 'monday' ? [...l.slice(1), l[0]] : l;
+}
+
+export function weekdayLetter(day: number, lang: Lang = 'en'): string {
+  return WEEKDAY_LETTERS[lang][day];
 }

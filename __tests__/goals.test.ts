@@ -17,7 +17,7 @@ describe('goal progress', () => {
     expect(p.ratio).toBeCloseTo(0.4);
     expect(p.reachedMilestoneIds).toEqual(['a']);
     expect(p.nextMilestone?.id).toBe('b');
-    expect(p.nextStep).toBe('8 sessions to reach “Projects”.');
+    expect(p.nextStep).toEqual({ key: 'goal.next.milestone', params: { amount: '8', unit: 'sessions', milestone: 'Projects' } });
   });
 
   it('adds linked-habit completions made since the goal started', () => {
@@ -32,16 +32,16 @@ describe('goal progress', () => {
     const p = goalProgress(goal({ manualProgress: 35 }), [], [], '2026-10-18');
     expect(p.ratio).toBe(1);
     expect(p.targetReached).toBe(true);
-    expect(p.nextStep).toMatch(/mark this goal/);
+    expect(p.nextStep.key).toBe('goal.next.reached');
   });
 
   it('handles deadlines', () => {
     expect(goalProgress(goal({ targetDate: '2026-10-25' }), [], [], '2026-10-18').daysLeft).toBe(7);
     const late = goalProgress(goal({ targetDate: '2026-10-10' }), [], [], '2026-10-18');
     expect(late.overdue).toBe(true);
-    expect(describeDaysLeft(late.daysLeft)).toBe('8 days overdue');
-    expect(describeDaysLeft(0)).toBe('Due today');
-    expect(describeDaysLeft(1)).toBe('1 day left');
+    expect(describeDaysLeft(late.daysLeft)).toEqual({ key: 'goal.overdue', params: { count: 8 } });
+    expect(describeDaysLeft(0)).toEqual({ key: 'goal.dueToday' });
+    expect(describeDaysLeft(1)).toEqual({ key: 'goal.daysLeft', params: { count: 1 } });
     expect(describeDaysLeft(null)).toBeNull();
   });
 });

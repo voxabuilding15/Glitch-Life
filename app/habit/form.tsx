@@ -7,12 +7,15 @@ import type { Weekday } from '@/domain/types';
 import { ColorPicker, DayPicker, HabitIcon, IconPicker } from '@/components/habit';
 import { DateField } from '@/components/DateField';
 import { Banner, Button, Chip, Field, Muted, Screen, ScreenHeader, Segmented, Text, Wrap } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { useI18n, useTheme } from '@/settings/SettingsProvider';
+import { spacing } from '@/theme';
 
 const UNITS = ['minutes', 'times', 'pages', 'glasses', 'km'];
 
 export default function HabitFormScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const { t, unit: unitLabel } = useI18n();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { state, today, saveHabit } = useStore();
   const existing = id ? state.habits.find((h) => h.id === id) : undefined;
@@ -30,10 +33,10 @@ export default function HabitFormScreen() {
   const [submitted, setSubmitted] = useState(false);
 
   const errors = {
-    name: !name.trim() ? 'Give your habit a name.' : name.trim().length > 60 ? 'Keep the name under 60 characters.' : null,
-    description: description.length > 200 ? 'Keep the description under 200 characters.' : null,
-    days: mode === 'days' && days.length === 0 ? 'Pick at least one day.' : null,
-    target: targetValue.trim() && !(Number(targetValue) > 0 && Number(targetValue) <= 100000) ? 'Enter a number greater than 0.' : null,
+    name: !name.trim() ? t('habitForm.errName') : name.trim().length > 60 ? t('habitForm.errNameLong') : null,
+    description: description.length > 200 ? t('habitForm.errDesc') : null,
+    days: mode === 'days' && days.length === 0 ? t('habitForm.errDays') : null,
+    target: targetValue.trim() && !(Number(targetValue) > 0 && Number(targetValue) <= 100000) ? t('habitForm.errTarget') : null,
   };
   const valid = !Object.values(errors).some(Boolean);
   const limitReached = !existing && !canAddHabit(currentPlan(), state.habits.length);
@@ -59,54 +62,54 @@ export default function HabitFormScreen() {
   if (id && !existing) {
     return (
       <Screen>
-        <ScreenHeader title="Habit" onBack={close} />
-        <Banner tone="error" message="This habit no longer exists." />
+        <ScreenHeader title={t('habit.title')} onBack={close} />
+        <Banner tone="error" message={t('habitForm.notFound')} />
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <ScreenHeader title={existing ? 'Edit habit' : 'New habit'} onBack={close} />
-      {limitReached ? <Banner tone="error" message="Habit limit reached for the free plan." /> : null}
+      <ScreenHeader title={existing ? t('habitForm.edit') : t('habitForm.new')} onBack={close} />
+      {limitReached ? <Banner tone="error" message={t('habitForm.limit')} /> : null}
 
       <View style={{ alignItems: 'center' }}>
         <HabitIcon habit={{ icon, color }} size={72} />
       </View>
 
-      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Read for 20 minutes" maxLength={70}
+      <Field label={t('habitForm.name')} value={name} onChangeText={setName} placeholder={t('habitForm.namePlaceholder')} maxLength={70}
         error={submitted ? errors.name : null} returnKeyType="next" />
-      <Field label="Description (optional)" value={description} onChangeText={setDescription} multiline maxLength={220}
-        placeholder="Why does this matter to you?" error={submitted ? errors.description : null} />
+      <Field label={t('habitForm.description')} value={description} onChangeText={setDescription} multiline maxLength={220}
+        placeholder={t('habitForm.descPlaceholder')} error={submitted ? errors.description : null} />
 
       <View style={{ gap: spacing.sm }}>
-        <Text variant="label" color={colors.accent}>Icon</Text>
+        <Text variant="label" color={colors.textMuted}>{t('habitForm.icon')}</Text>
         <IconPicker value={icon} onChange={setIcon} color={color} />
       </View>
       <View style={{ gap: spacing.sm }}>
-        <Text variant="label" color={colors.accent}>Accent color (optional)</Text>
+        <Text variant="label" color={colors.textMuted}>{t('habitForm.color')}</Text>
         <ColorPicker value={color} onChange={setColor} />
       </View>
 
       <View style={{ gap: spacing.sm }}>
-        <Text variant="label" color={colors.accent}>Schedule</Text>
-        <Segmented value={mode} onChange={setMode} options={[{ value: 'daily', label: 'Every day' }, { value: 'days', label: 'Selected days' }]} />
+        <Text variant="label" color={colors.textMuted}>{t('habitForm.schedule')}</Text>
+        <Segmented value={mode} onChange={setMode} options={[{ value: 'daily', label: t('habitForm.everyDay') }, { value: 'days', label: t('habitForm.selectedDays') }]} />
         {mode === 'days' ? <DayPicker value={days} onChange={setDays} weekStartsMonday={mondayFirst} /> : null}
         {submitted && errors.days ? <Text variant="caption" color={colors.danger}>{errors.days}</Text> : null}
       </View>
 
       <View style={{ gap: spacing.sm }}>
-        <Field label="Daily target (optional)" value={targetValue} onChangeText={setTargetValue} keyboardType="numeric"
-          placeholder="e.g. 20" error={submitted ? errors.target : null} hint="Shown on your habit as a reminder of the goal for the day." />
+        <Field label={t('habitForm.target')} value={targetValue} onChangeText={setTargetValue} keyboardType="numeric"
+          placeholder={t('habitForm.targetPlaceholder')} error={submitted ? errors.target : null} hint={t('habitForm.targetHint')} />
         <Wrap>
-          {UNITS.map((u) => <Chip key={u} label={u} selected={unit === u} onPress={() => setUnit(u)} />)}
+          {UNITS.map((u) => <Chip key={u} label={unitLabel(u)} selected={unit === u} onPress={() => setUnit(u)} />)}
         </Wrap>
       </View>
 
-      <DateField label="Start date" value={startDate} today={today} onChange={(v) => v && setStartDate(v)} quick={[{ label: 'Tomorrow', days: 1 }]} />
+      <DateField label={t('habitForm.startDate')} value={startDate} today={today} onChange={(v) => v && setStartDate(v)} quick={[{ label: t('habitForm.tomorrow'), days: 1 }]} />
 
-      <Button title={existing ? 'Save changes' : 'Create habit'} onPress={submit} icon="check" disabled={limitReached} />
-      {submitted && !valid ? <Muted style={{ textAlign: 'center' }}>Fix the highlighted fields to continue.</Muted> : null}
+      <Button title={existing ? t('common.saveChanges') : t('habitForm.create')} onPress={submit} icon="check" disabled={limitReached} />
+      {submitted && !valid ? <Muted style={{ textAlign: 'center' }}>{t('habitForm.fixFields')}</Muted> : null}
     </Screen>
   );
 }

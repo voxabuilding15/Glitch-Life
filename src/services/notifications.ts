@@ -41,14 +41,16 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   }
 }
 
-export async function scheduleFocusEnd(endsAt: number, taskName: string): Promise<string | null> {
+export interface NotificationText {
+  title: string;
+  body: string;
+}
+
+export async function scheduleFocusEnd(endsAt: number, text: NotificationText): Promise<string | null> {
   if (Platform.OS === 'web' || endsAt <= Date.now()) return null;
   try {
     return await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Focus session complete',
-        body: taskName ? `Nice work on “${taskName}”.` : 'Nice work — your focus session is done.',
-      },
+      content: { title: text.title, body: text.body },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: endsAt, channelId: CHANNEL_ID },
     });
   } catch {
@@ -56,11 +58,11 @@ export async function scheduleFocusEnd(endsAt: number, taskName: string): Promis
   }
 }
 
-export async function scheduleDailyReminder(hour: number, minute: number): Promise<string | null> {
+export async function scheduleDailyReminder(hour: number, minute: number, text: NotificationText): Promise<string | null> {
   if (Platform.OS === 'web') return null;
   try {
     return await Notifications.scheduleNotificationAsync({
-      content: { title: 'Glitch Life', body: 'Make today count — check in on your habits.' },
+      content: { title: text.title, body: text.body },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, channelId: CHANNEL_ID },
     });
   } catch {

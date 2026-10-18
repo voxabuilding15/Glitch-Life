@@ -1,41 +1,40 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { LocaleProvider, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from '@/data/store';
 import { configureNotifications } from '@/services/notifications';
 import { Banner, Button, Muted, Text } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { SettingsProvider, useI18n, useSettings, useTheme } from '@/settings/SettingsProvider';
+import { spacing } from '@/theme';
 
 function Gate() {
   const { status, loadError, retryLoad, saveError, recovered } = useStore();
+  const { colors } = useTheme();
+  const { t } = useI18n();
 
   if (status === 'loading') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.highlight} size="large" accessibilityLabel="Loading your data" />
+        <ActivityIndicator color={colors.text} size="large" accessibilityLabel={t('common.loading')} />
       </View>
     );
   }
   if (status === 'error') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: spacing.xl, gap: spacing.lg }}>
-        <Text variant="title">Couldn’t open your data</Text>
-        <Muted>{loadError ?? 'Something went wrong reading local storage.'}</Muted>
-        <Button title="Try again" onPress={retryLoad} icon="refresh-cw" />
+        <Text variant="title">{t('app.loadErrorTitle')}</Text>
+        <Muted>{loadError ? t('app.loadErrorMsg') : ''}</Muted>
+        <Button title={t('common.tryAgain')} onPress={retryLoad} icon="refresh-cw" />
       </View>
     );
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      {saveError ? (
+      {saveError || recovered ? (
         <View style={{ position: 'absolute', top: 48, left: 16, right: 16, zIndex: 10 }}>
-          <Banner tone="error" message={saveError} />
-        </View>
-      ) : recovered ? (
-        <View style={{ position: 'absolute', top: 48, left: 16, right: 16, zIndex: 10 }}>
-          <Banner message="Saved data was unreadable, so Glitch Life started fresh. A backup was kept on this device." />
+          <Banner tone={saveError ? 'error' : 'info'} message={saveError ? t('app.saveError') : t('app.recovered')} />
         </View>
       ) : null}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'fade_from_bottom' }}>
@@ -46,16 +45,30 @@ function Gate() {
   );
 }
 
+function Shell() {
+  const { ready } = useSettings();
+  const { colors, isDark } = useTheme();
+  const { rtl } = useI18n();
+  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  return (
+    <LocaleProvider direction={rtl ? 'rtl' : 'ltr'}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StoreProvider>
+        <Gate />
+      </StoreProvider>
+    </LocaleProvider>
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     configureNotifications();
   }, []);
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <StoreProvider>
-        <Gate />
-      </StoreProvider>
+      <SettingsProvider>
+        <Shell />
+      </SettingsProvider>
     </SafeAreaProvider>
   );
 }

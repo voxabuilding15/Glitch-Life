@@ -1,4 +1,5 @@
 import { diffDays } from './dates';
+import type { Msg } from '@/i18n/types';
 import type { DateKey, Goal, GoalMilestone, HabitCompletion } from './types';
 
 export interface GoalProgress {
@@ -10,8 +11,8 @@ export interface GoalProgress {
   fromHabits: number;
   reachedMilestoneIds: string[];
   nextMilestone: GoalMilestone | null;
-  /** Plain-language description of what to do next. */
-  nextStep: string;
+  /** What to do next, as a translatable message. */
+  nextStep: Msg;
   daysLeft: number | null;
   overdue: boolean;
   targetReached: boolean;
@@ -38,13 +39,15 @@ export function goalProgress(
   const nextMilestone = own.find((m) => current < m.target) ?? null;
   const targetReached = current >= target;
 
-  let nextStep: string;
-  if (goal.completedAt) nextStep = 'Goal completed. Well done!';
-  else if (targetReached) nextStep = 'Target reached — mark this goal as completed.';
+  let nextStep: Msg;
+  if (goal.completedAt) nextStep = { key: 'goal.next.completed' };
+  else if (targetReached) nextStep = { key: 'goal.next.reached' };
   else if (nextMilestone && nextMilestone.target < target) {
-    const left = nextMilestone.target - current;
-    nextStep = `${formatCount(left)} ${goal.unit} to reach “${nextMilestone.title}”.`;
-  } else nextStep = `${formatCount(target - current)} ${goal.unit} to go.`;
+    nextStep = {
+      key: 'goal.next.milestone',
+      params: { amount: formatCount(nextMilestone.target - current), unit: goal.unit, milestone: nextMilestone.title },
+    };
+  } else nextStep = { key: 'goal.next.togo', params: { amount: formatCount(target - current), unit: goal.unit } };
 
   const daysLeft = goal.targetDate ? diffDays(today, goal.targetDate) : null;
   return {
@@ -65,9 +68,10 @@ function formatCount(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-export function describeDaysLeft(daysLeft: number | null): string | null {
+/** Deadline wording as a translatable message (plural-aware via `count`). */
+export function describeDaysLeft(daysLeft: number | null): Msg | null {
   if (daysLeft === null) return null;
-  if (daysLeft < 0) return `${-daysLeft} day${daysLeft === -1 ? '' : 's'} overdue`;
-  if (daysLeft === 0) return 'Due today';
-  return `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+  if (daysLeft < 0) return { key: 'goal.overdue', params: { count: -daysLeft } };
+  if (daysLeft === 0) return { key: 'goal.dueToday' };
+  return { key: 'goal.daysLeft', params: { count: daysLeft } };
 }

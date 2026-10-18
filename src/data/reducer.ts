@@ -26,6 +26,7 @@ export type Action =
   | { type: 'TIMER_START'; init: TimerInit; now: number; notificationId: string | null }
   | { type: 'TIMER_PAUSE'; now: number }
   | { type: 'TIMER_RESUME'; now: number; notificationId: string | null }
+  | { type: 'TIMER_SET_NOTIFICATION'; notificationId: string | null }
   | { type: 'TIMER_RESET' }
   | { type: 'TIMER_FINISH'; now: number; sessionId: string }
   | { type: 'FOCUS_HISTORY_CLEAR' };
@@ -122,6 +123,10 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'TIMER_RESUME':
       return state.activeTimer
         ? { ...state, activeTimer: { ...resumeTimer(state.activeTimer, action.now), notificationId: action.notificationId } }
+        : state;
+    case 'TIMER_SET_NOTIFICATION':
+      return state.activeTimer && state.activeTimer.status === 'running'
+        ? { ...state, activeTimer: { ...state.activeTimer, notificationId: action.notificationId } }
         : state;
     case 'TIMER_RESET':
       return { ...state, activeTimer: null };

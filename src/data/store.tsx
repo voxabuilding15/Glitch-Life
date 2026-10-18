@@ -11,6 +11,8 @@ import type {
 import {
   cancelNotification, ensureNotificationPermission, scheduleDailyReminder, scheduleFocusEnd,
 } from '@/services/notifications';
+import { translate } from '@/i18n';
+import { useSettings } from '@/settings/SettingsProvider';
 import { reducer } from './reducer';
 import { createInitialState, makeId } from './schema';
 import { clearState, loadState, saveState } from './storage';
@@ -41,9 +43,9 @@ type Status = 'loading' | 'ready' | 'error';
 
 interface Store {
   status: Status;
-  loadError: string | null;
+  loadError: boolean;
   recovered: boolean;
-  saveError: string | null;
+  saveError: boolean;
   state: AppState;
   today: DateKey;
   index: CompletionIndex;
@@ -73,6 +75,13 @@ export function useStore(): Store {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside <StoreProvider>');
   return ctx;
+}
+
+function focusText(lang: Parameters<typeof translate>[0], taskName: string) {
+  return {
+    title: translate(lang, 'notif.focusTitle'),
+    body: taskName ? translate(lang, 'notif.focusBodyTask', { task: taskName }) : translate(lang, 'notif.focusBody'),
+  };
 }
 
 function useToday(): DateKey {
@@ -105,11 +114,14 @@ function useToday(): DateKey {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => createInitialState(Date.now()));
   const [status, setStatus] = useState<Status>('loading');
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [recovered, setRecovered] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const today = useToday();
+  const { language } = useSettings();
+  const langRef = useRef(language);
+  langRef.current = language;
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -123,12 +135,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         dispatch({ type: 'HYDRATE', state: res.state });
         setRecovered(res.recovered);
-        setLoadError(null);
+        setLoadError(false);
         setStatus('ready');
       })
-      .catch((e: unknown) => {
+      .catch(() => {
         if (cancelled) return;
-        setLoadError(e instanceof Error ? e.message : 'Could not read your data.');
+        setLoadError(true);
         setStatus('error');
       });
     return () => {
@@ -142,8 +154,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const snapshot = state;
     saveChain.current = saveChain.current
       .then(() => saveState(snapshot))
-      .then(() => setSaveError(null))
-      .catch(() => setSaveError('Your latest changes could not be saved on this device.'));
+      .then(() => setSaveError(false))
+      .catch(() => setSaveError(true));
   }, [state, status]);
 
   // Finish the timer from timestamps: on a tick, when returning to the app, and after launch.
@@ -162,6 +174,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       sub.remove();
     };
   }, [status]);
+
+  // When the language changes, re-create pending notifications so their text matches the new language.
+  const prevLang = useRef(language);
+  useEffect(() => {
+    if (status !== 'ready' || prevLang.current === language) return;
+    prevLang.current = language;
+    const { preferences, activeTimer } = stateRef.current;
+    void (async () => {
+      if (preferences.dailyReminderEnabled && preferences.dailyReminderNotificationId) {
+        await cancelNotification(preferences.dailyReminderNotificationId);
+        const id = await scheduleDailyReminder(preferences.dailyReminderHour, preferences.dailyReminderMinute, {
+          title: translate(language, 'notif.reminderTitle'),
+          body: translate(language, 'notif.reminderBody'),
+        });
+        dispatch({ type: 'PREFERENCES_UPDATE', patch: { dailyReminderNotificationId: id, dailyReminderEnabled: id !== null } });
+      }
+      if (activeTimer?.status === 'running' && activeTimer.notificationId) {
+        await cancelNotification(activeTimer.notificationId);
+        const id = await scheduleFocusEnd(endTimestamp(activeTimer, Date.now()), focusText(language, activeTimer.taskName));
+        dispatch({ type: 'TIMER_SET_NOTIFICATION', notificationId: id });
+      }
+    })();
+  }, [language, status]);
 
   const index = useMemo(() => buildCompletionIndex(state.completions), [state.completions]);
 
@@ -225,7 +260,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
     const allowed = await ensureNotificationPermission();
-    const id = allowed ? await scheduleDailyReminder(hour, minute) : null;
+    const id = allowed ? await scheduleDailyReminder(hour, minute, {
+      title: translate(langRef.current, 'notif.reminderTitle'),
+      body: translate(langRef.current, 'notif.reminderBody'),
+    }) : null;
     dispatch({
       type: 'PREFERENCES_UPDATE',
       patch: { dailyReminderEnabled: id !== null, dailyReminderHour: hour, dailyReminderMinute: minute, dailyReminderNotificationId: id },
@@ -237,7 +275,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     let notificationId: string | null = null;
     if (stateRef.current.preferences.focusAlertsEnabled && (await ensureNotificationPermission())) {
-      notificationId = await scheduleFocusEnd(now + init.plannedSeconds * 1000, init.taskName);
+      notificationId = await scheduleFocusEnd(now + init.plannedSeconds * 1000, focusText(langRef.current, init.taskName));
     }
     dispatch({ type: 'TIMER_START', init, now, notificationId });
   }, []);
@@ -252,7 +290,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     let notificationId: string | null = null;
     if (t && stateRef.current.preferences.focusAlertsEnabled && (await ensureNotificationPermission())) {
-      notificationId = await scheduleFocusEnd(endTimestamp({ ...t, status: 'paused' }, now), t.taskName);
+      notificationId = await scheduleFocusEnd(endTimestamp({ ...t, status: 'paused' }, now), focusText(langRef.current, t.taskName));
     }
     dispatch({ type: 'TIMER_RESUME', now, notificationId });
   }, []);

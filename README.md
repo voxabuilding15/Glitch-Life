@@ -35,6 +35,13 @@ npm run typecheck    # tsc --noEmit (strict)
 | Focus Timer | 15/25/45/60/90 + custom, task name, link to habit/goal, start/pause/resume/reset, ring + large countdown, completion screen, session history and totals. |
 | Onboarding | 3 optional steps (areas, main goal, suggested habits); skippable; leads to the first-habit prompt. |
 
+### Languages & themes
+* **Languages:** English 🇬🇧, Français 🇫🇷, العربية 🇲🇦 (Arabic is fully right-to-left). Pick one in **You → Language** (or on the first onboarding screen). The first launch follows the device language when supported.
+* **Themes:** Light, Dark or System default, in **You → Appearance → Theme**. Dark keeps the original navy brand palette; Light uses clean blue-white surfaces. All text/background pairs are tested for WCAG AA contrast.
+* Both choices apply instantly (no restart) and are stored locally under their own AsyncStorage key (`glitchlife.settings`), separate from app data.
+* **Adding/editing text:** edit `src/i18n/en.ts` (source of truth, typed keys), then `fr.ts` / `ar.ts` — TypeScript and `__tests__/i18n.test.ts` fail if a key, placeholder or Arabic plural form is missing. Plural forms use `key_one` / `key_other` (+ `_zero/_two/_few/_many` for Arabic).
+* **RTL:** mirroring is done by the app (`src/i18n/layout.ts`, `useI18n().row/icon/textAlign`), not `I18nManager.forceRTL`, which only applies after a restart. Digits stay Western (0-9), as is usual in Morocco; month names use the Moroccan forms.
+
 ### Focus timer accuracy
 Timer state (`status`, `accumulatedMs`, `runningSince`, …) is persisted. Remaining time is always **derived from timestamps**, never from tick counts, so backgrounding or killing the app doesn’t drift. When the app returns (or relaunches) a finished timer is saved with its true end time. A local notification is scheduled for the end time; if permission is denied the timer still works.
 
@@ -46,7 +53,9 @@ src/domain/             Pure logic: dates, streaks, charts data, goals, timer, e
 src/data/               Schema/migration, reducer, AsyncStorage persistence, React store
 src/services/           Notifications, haptics
 src/components/         Reusable UI (ui, charts, habit, goal, DateField)
-src/theme/              Colors, spacing, typography
+src/theme/              Light/dark palettes, spacing, typography
+src/i18n/               Translations (en/fr/ar), plural rules, RTL helpers
+src/settings/           Language + theme provider and persistence
 __tests__/              Unit tests for the domain + reducer
 ```
 

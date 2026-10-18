@@ -1,4 +1,5 @@
-import { addDays, diffDays, monthKeys, startOfWeek, weekKeys, weekdayOf } from './dates';
+import { addDays, diffDays, monthKeys, startOfWeek, weekdayLetter, weekKeys, weekdayOf } from './dates';
+import type { Lang } from '@/i18n/types';
 import type { DateKey, Habit, HabitCompletion, WeekStart } from './types';
 
 /** Fast lookup of `habitId:date` pairs. */
@@ -97,13 +98,17 @@ export interface ChartDay extends DayStats {
   isToday: boolean;
 }
 
-const LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
 /** Seven days of the week containing `today`, with real completion percentages. */
-export function weeklyChart(habits: Habit[], index: CompletionIndex, today: DateKey, weekStart: WeekStart): ChartDay[] {
+export function weeklyChart(
+  habits: Habit[],
+  index: CompletionIndex,
+  today: DateKey,
+  weekStart: WeekStart,
+  lang: Lang = 'en',
+): ChartDay[] {
   return weekKeys(today, weekStart).map((date) => ({
     ...dayStats(habits, index, date),
-    label: LETTERS[weekdayOf(date)],
+    label: weekdayLetter(weekdayOf(date), lang),
     isFuture: date > today,
     isToday: date === today,
   }));

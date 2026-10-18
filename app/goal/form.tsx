@@ -5,13 +5,16 @@ import { useStore } from '@/data/store';
 import { canAddGoal, currentPlan } from '@/domain/entitlements';
 import { DateField } from '@/components/DateField';
 import { Banner, Button, Card, Chip, Field, IconButton, Muted, Row, Screen, ScreenHeader, Text, Wrap } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { useI18n, useTheme } from '@/settings/SettingsProvider';
+import { spacing } from '@/theme';
 
 const UNITS = ['sessions', 'hours', 'pages', 'km', 'steps'];
 interface MilestoneDraft { title: string; target: string }
 
 export default function GoalFormScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const { t, unit: unitLabel } = useI18n();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { state, today, saveGoal } = useStore();
   const existing = id ? state.goals.find((g) => g.id === id) : undefined;
@@ -29,12 +32,12 @@ export default function GoalFormScreen() {
 
   const target = Number(targetValue);
   const errors = {
-    title: !title.trim() ? 'Give your goal a title.' : title.trim().length > 80 ? 'Keep the title under 80 characters.' : null,
-    target: !(target > 0 && target <= 1_000_000) ? 'Enter a target greater than 0.' : null,
-    description: description.length > 300 ? 'Keep the description under 300 characters.' : null,
-    date: targetDate && targetDate < today && !existing ? 'Pick a date in the future.' : null,
+    title: !title.trim() ? t('goalForm.errTitle') : title.trim().length > 80 ? t('goalForm.errTitleLong') : null,
+    target: !(target > 0 && target <= 1_000_000) ? t('goalForm.errTarget') : null,
+    description: description.length > 300 ? t('goalForm.errDesc') : null,
+    date: targetDate && targetDate < today && !existing ? t('goalForm.errDate') : null,
     milestones: milestones.some((m) => !m.title.trim() || !(Number(m.target) > 0) || (target > 0 && Number(m.target) > target))
-      ? 'Each milestone needs a name and a target between 1 and your goal target.' : null,
+      ? t('goalForm.errMilestones') : null,
   };
   const valid = !Object.values(errors).some(Boolean);
   const limitReached = !existing && !canAddGoal(currentPlan(), state.goals.filter((g) => !g.completedAt).length);
@@ -54,56 +57,58 @@ export default function GoalFormScreen() {
   if (id && !existing) {
     return (
       <Screen>
-        <ScreenHeader title="Goal" onBack={close} />
-        <Banner tone="error" message="This goal no longer exists." />
+        <ScreenHeader title={t('goal.title')} onBack={close} />
+        <Banner tone="error" message={t('goal.notFound')} />
       </Screen>
     );
   }
 
+  const uLabel = unitLabel(unit);
+
   return (
     <Screen>
-      <ScreenHeader title={existing ? 'Edit goal' : 'New goal'} onBack={close} />
-      {limitReached ? <Banner tone="error" message="Active goal limit reached for the free plan." /> : null}
+      <ScreenHeader title={existing ? t('goalForm.edit') : t('goalForm.new')} onBack={close} />
+      {limitReached ? <Banner tone="error" message={t('goalForm.limit')} /> : null}
 
-      <Field label="Title" value={title} onChangeText={setTitle} placeholder="e.g. Learn Python" maxLength={90} error={submitted ? errors.title : null} />
-      <Field label="Description (optional)" value={description} onChangeText={setDescription} multiline maxLength={320}
-        placeholder="What does success look like?" error={submitted ? errors.description : null} />
+      <Field label={t('goalForm.title')} value={title} onChangeText={setTitle} placeholder={t('goalForm.titlePlaceholder')} maxLength={90} error={submitted ? errors.title : null} />
+      <Field label={t('goalForm.description')} value={description} onChangeText={setDescription} multiline maxLength={320}
+        placeholder={t('goalForm.descPlaceholder')} error={submitted ? errors.description : null} />
 
       <View style={{ gap: spacing.sm }}>
-        <Field label="Target" value={targetValue} onChangeText={setTargetValue} keyboardType="numeric" placeholder="e.g. 30"
-          error={submitted ? errors.target : null} hint="How much you need to complete to reach this goal." />
-        <Wrap>{UNITS.map((u) => <Chip key={u} label={u} selected={unit === u} onPress={() => setUnit(u)} />)}</Wrap>
+        <Field label={t('goalForm.target')} value={targetValue} onChangeText={setTargetValue} keyboardType="numeric" placeholder={t('goalForm.targetPlaceholder')}
+          error={submitted ? errors.target : null} hint={t('goalForm.targetHint')} />
+        <Wrap>{UNITS.map((u) => <Chip key={u} label={unitLabel(u)} selected={unit === u} onPress={() => setUnit(u)} />)}</Wrap>
       </View>
 
-      <DateField label="Target date (optional)" value={targetDate} today={today} allowEmpty onChange={setTargetDate}
-        quick={[{ label: '+1 week', days: 7 }, { label: '+1 month', days: 30 }, { label: '+3 months', days: 90 }]} />
+      <DateField label={t('goalForm.targetDate')} value={targetDate} today={today} allowEmpty onChange={setTargetDate}
+        quick={[{ label: t('goalForm.plus1w'), days: 7 }, { label: t('goalForm.plus1m'), days: 30 }, { label: t('goalForm.plus3m'), days: 90 }]} />
       {submitted && errors.date ? <Text variant="caption" color={colors.danger}>{errors.date}</Text> : null}
 
       <View style={{ gap: spacing.sm }}>
-        <Text variant="label" color={colors.accent}>Milestones (optional)</Text>
-        <Muted variant="caption">Checkpoints along the way, measured in {unit}. They are reached automatically as your progress grows.</Muted>
+        <Text variant="label" color={colors.textMuted}>{t('goalForm.milestones')}</Text>
+        <Muted variant="caption">{t('goalForm.milestonesHint', { unit: uLabel })}</Muted>
         {milestones.map((m, i) => (
           <Card key={i} style={{ padding: spacing.md, gap: spacing.sm }}>
             <Row>
               <View style={{ flex: 1 }}>
-                <Field label={`Milestone ${i + 1} name`} value={m.title} placeholder="e.g. Finish the basics" maxLength={60}
+                <Field label={t('goalForm.milestoneName', { n: i + 1 })} value={m.title} placeholder={t('goalForm.milestonePlaceholder')} maxLength={60}
                   onChangeText={(v) => setMilestones((l) => l.map((x, j) => (j === i ? { ...x, title: v } : x)))} />
               </View>
-              <IconButton icon="x" label={`Remove milestone ${i + 1}`} onPress={() => setMilestones((l) => l.filter((_, j) => j !== i))} />
+              <IconButton icon="x" label={t('goalForm.removeMilestone', { n: i + 1 })} onPress={() => setMilestones((l) => l.filter((_, j) => j !== i))} />
             </Row>
-            <Field label={`Reached at (${unit})`} value={m.target} keyboardType="numeric" placeholder="e.g. 10"
+            <Field label={t('goalForm.reachedAt', { unit: uLabel })} value={m.target} keyboardType="numeric" placeholder={t('goalForm.targetPlaceholder')}
               onChangeText={(v) => setMilestones((l) => l.map((x, j) => (j === i ? { ...x, target: v } : x)))} />
           </Card>
         ))}
         {submitted && errors.milestones ? <Text variant="caption" color={colors.danger}>{errors.milestones}</Text> : null}
-        <Button title="Add milestone" icon="plus" variant="secondary" onPress={() => setMilestones((l) => [...l, { title: '', target: '' }])} />
+        <Button title={t('goalForm.addMilestone')} icon="plus" variant="secondary" onPress={() => setMilestones((l) => [...l, { title: '', target: '' }])} />
       </View>
 
       <View style={{ gap: spacing.sm }}>
-        <Text variant="label" color={colors.accent}>Linked habits (optional)</Text>
-        <Muted variant="caption">Each completion of a linked habit counts as +1 progress.</Muted>
+        <Text variant="label" color={colors.textMuted}>{t('goalForm.linked')}</Text>
+        <Muted variant="caption">{t('goalForm.linkedHint')}</Muted>
         {state.habits.length === 0 ? (
-          <Muted variant="caption">Create a habit first to link it here.</Muted>
+          <Muted variant="caption">{t('goalForm.createHabitFirst')}</Muted>
         ) : (
           <Wrap>
             {state.habits.map((h) => (
@@ -114,7 +119,7 @@ export default function GoalFormScreen() {
         )}
       </View>
 
-      <Button title={existing ? 'Save changes' : 'Create goal'} icon="check" onPress={submit} disabled={limitReached} />
+      <Button title={existing ? t('common.saveChanges') : t('goalForm.create')} icon="check" onPress={submit} disabled={limitReached} />
     </Screen>
   );
 }

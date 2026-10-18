@@ -4,9 +4,11 @@ import { useStore } from '@/data/store';
 import { goalProgress } from '@/domain/goals';
 import { GoalCard } from '@/components/goal';
 import { EmptyState, IconButton, Row, Screen, Segmented, Text } from '@/components/ui';
+import { useI18n } from '@/settings/SettingsProvider';
 
 export default function GoalsScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const { state, today } = useStore();
   const [tab, setTab] = useState<'active' | 'done'>('active');
   const { goals, milestones, completions } = state;
@@ -17,30 +19,24 @@ export default function GoalsScreen() {
   return (
     <Screen tabs>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text variant="display" accessibilityRole="header">Goals</Text>
-        <IconButton icon="plus" label="Add goal" filled onPress={() => router.push('/goal/form')} />
+        <Text variant="display" accessibilityRole="header">{t('goals.title')}</Text>
+        <IconButton icon="plus" label={t('goals.add')} filled onPress={() => router.push('/goal/form')} />
       </Row>
 
       <Segmented
         value={tab}
         onChange={setTab}
         options={[
-          { value: 'active', label: `Active (${active.length})` },
-          { value: 'done', label: `Completed (${done.length})` },
+          { value: 'active', label: t('goals.tabActive', { count: active.length }) },
+          { value: 'done', label: t('goals.tabDone', { count: done.length }) },
         ]}
       />
 
       {list.length === 0 ? (
         tab === 'active' ? (
-          <EmptyState
-            icon="target"
-            title="No active goals"
-            message="Set something measurable, like “Complete 30 study sessions”, and track it step by step."
-            actionLabel="Create a goal"
-            onAction={() => router.push('/goal/form')}
-          />
+          <EmptyState icon="target" title={t('goals.emptyTitle')} message={t('goals.emptyMsg')} actionLabel={t('goals.emptyCta')} onAction={() => router.push('/goal/form')} />
         ) : (
-          <EmptyState icon="award" title="Nothing completed yet" message="Goals you finish will be collected here." />
+          <EmptyState icon="award" title={t('goals.doneEmptyTitle')} message={t('goals.doneEmptyMsg')} />
         )
       ) : (
         list.map((g) => (

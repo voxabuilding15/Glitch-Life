@@ -1,5 +1,5 @@
 import {
-  addDays, addMonths, diffDays, formatClock, formatDuration, greetingFor, isValidDateKey,
+  addDays, addMonths, diffDays, formatClock, formatDuration, greetingKey, isValidDateKey,
   monthKeys, startOfWeek, toDateKey, weekKeys, weekdayOf,
 } from '@/domain/dates';
 
@@ -40,9 +40,10 @@ describe('dates', () => {
   });
 
   it('greets by time of day', () => {
-    expect(greetingFor(new Date(2026, 0, 1, 8))).toBe('Good morning');
-    expect(greetingFor(new Date(2026, 0, 1, 14))).toBe('Good afternoon');
-    expect(greetingFor(new Date(2026, 0, 1, 20))).toBe('Good evening');
+    expect(greetingKey(new Date(2026, 0, 1, 8))).toBe('greeting.morning');
+    expect(greetingKey(new Date(2026, 0, 1, 14))).toBe('greeting.afternoon');
+    expect(greetingKey(new Date(2026, 0, 1, 20))).toBe('greeting.evening');
+    expect(greetingKey(new Date(2026, 0, 1, 2))).toBe('greeting.night');
   });
 
   it('formats durations', () => {

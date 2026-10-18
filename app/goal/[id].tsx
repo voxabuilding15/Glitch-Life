@@ -3,15 +3,17 @@ import { Alert, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useStore } from '@/data/store';
-import { formatShortDate } from '@/domain/dates';
 import { describeDaysLeft, goalProgress } from '@/domain/goals';
 import { ProgressRing } from '@/components/charts';
 import { HabitIcon } from '@/components/habit';
 import { Banner, Button, Card, IconButton, Muted, ProgressBar, Row, Screen, ScreenHeader, SectionTitle, Text, Wrap } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { useI18n, useTheme } from '@/settings/SettingsProvider';
+import { spacing } from '@/theme';
 
 export default function GoalDetailScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const { t, tm, unit, shortDate, icon } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, today, adjustGoal, setGoalCompleted, deleteGoal } = useStore();
   const goal = state.goals.find((g) => g.id === id);
@@ -20,8 +22,8 @@ export default function GoalDetailScreen() {
   if (!goal) {
     return (
       <Screen>
-        <ScreenHeader title="Goal" onBack={close} />
-        <Banner tone="error" message="This goal no longer exists." />
+        <ScreenHeader title={t('goal.title')} onBack={close} />
+        <Banner tone="error" message={t('goal.notFound')} />
       </Screen>
     );
   }
@@ -31,22 +33,23 @@ export default function GoalDetailScreen() {
   const habits = state.habits.filter((h) => goal.linkedHabitIds.includes(h.id));
   const left = describeDaysLeft(p.daysLeft);
   const completed = !!goal.completedAt;
+  const u = unit(goal.unit);
 
   const confirmDelete = () =>
-    Alert.alert('Delete goal?', `“${goal.title}” and its milestones will be permanently removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { deleteGoal(goal.id); close(); } },
+    Alert.alert(t('goal.deleteTitle'), t('goal.deleteMsg', { title: goal.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => { deleteGoal(goal.id); close(); } },
     ]);
 
   return (
     <Screen>
       <ScreenHeader
-        title="Goal"
+        title={t('goal.title')}
         onBack={close}
         right={
           <Row style={{ gap: 0 }}>
-            <IconButton icon="edit-2" label="Edit goal" onPress={() => router.push({ pathname: '/goal/form', params: { id: goal.id } })} />
-            <IconButton icon="trash-2" label="Delete goal" color={colors.danger} onPress={confirmDelete} />
+            <IconButton icon="edit-2" label={t('goal.editA11y')} onPress={() => router.push({ pathname: '/goal/form', params: { id: goal.id } })} />
+            <IconButton icon="trash-2" label={t('goal.deleteA11y')} color={colors.danger} onPress={confirmDelete} />
           </Row>
         }
       />
@@ -54,24 +57,28 @@ export default function GoalDetailScreen() {
       <View style={{ gap: 4 }}>
         <Text variant="title" accessibilityRole="header">{goal.title}</Text>
         {goal.description ? <Muted>{goal.description}</Muted> : null}
-        {left && !completed ? <Text variant="caption" color={p.overdue ? colors.danger : colors.accent}>{left} · {formatShortDate(goal.targetDate!)}</Text> : null}
+        {left && !completed ? (
+          <Text variant="caption" color={p.overdue ? colors.danger : colors.accent}>
+            {tm(left)}{goal.targetDate ? ` · ${shortDate(goal.targetDate)}` : ''}
+          </Text>
+        ) : null}
       </View>
 
       <Card>
         <Row style={{ gap: spacing.lg }}>
           <ProgressRing ratio={p.ratio} size={96} stroke={9}>
-            <Text variant="heading">{Math.round(p.ratio * 100)}%</Text>
+            <Text variant="heading" style={{ textAlign: 'center' }}>{Math.round(p.ratio * 100)}%</Text>
           </ProgressRing>
           <View style={{ flex: 1, gap: 4 }}>
-            <Text variant="title" accessibilityLabel={`${p.current} of ${p.target} ${goal.unit}`}>{p.current}/{p.target}</Text>
-            <Muted>{goal.unit}</Muted>
-            {p.fromHabits > 0 ? <Muted variant="caption">{p.fromHabits} from linked habits</Muted> : null}
+            <Text variant="title" accessibilityLabel={t('goal.cardA11y', { title: goal.title, current: p.current, target: p.target, unit: u })}>{p.current}/{p.target}</Text>
+            <Muted>{u}</Muted>
+            {p.fromHabits > 0 ? <Muted variant="caption">{t('goal.fromHabits', { count: p.fromHabits })}</Muted> : null}
           </View>
         </Row>
-        <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-          <Feather name="arrow-right-circle" size={18} color={colors.highlight} />
-          <Text variant="label" style={{ flex: 1 }}>{p.nextStep}</Text>
-        </View>
+        <Row style={{ gap: spacing.sm }}>
+          <Feather name={icon('arrow-right-circle')} size={18} color={colors.text} />
+          <Text variant="label" style={{ flex: 1 }}>{tm(p.nextStep)}</Text>
+        </Row>
       </Card>
 
       {!completed ? (
@@ -84,14 +91,14 @@ export default function GoalDetailScreen() {
 
       {milestones.length > 0 ? (
         <View style={{ gap: spacing.sm }}>
-          <SectionTitle title="Milestones" />
+          <SectionTitle title={t('goal.milestones')} />
           <Card style={{ gap: spacing.md }}>
             {milestones.map((m) => {
               const reached = p.reachedMilestoneIds.includes(m.id);
               return (
-                <View key={m.id} style={{ gap: 6 }} accessible accessibilityLabel={`${m.title}, ${m.target} ${goal.unit}, ${reached ? 'reached' : 'not reached'}`}>
+                <View key={m.id} style={{ gap: 6 }} accessible accessibilityLabel={t('goal.milestoneA11y', { title: m.title, target: m.target, unit: u, state: reached ? t('goal.reached') : t('goal.notReached') })}>
                   <Row>
-                    <Feather name={reached ? 'check-circle' : 'circle'} size={22} color={reached ? colors.highlight : colors.accent} />
+                    <Feather name={reached ? 'check-circle' : 'circle'} size={22} color={reached ? colors.selected : colors.accent} />
                     <Text style={{ flex: 1, opacity: reached ? 0.7 : 1 }}>{m.title}</Text>
                     <Muted variant="caption">{Math.min(p.current, m.target)}/{m.target}</Muted>
                   </Row>
@@ -105,10 +112,10 @@ export default function GoalDetailScreen() {
 
       {habits.length > 0 ? (
         <View style={{ gap: spacing.sm }}>
-          <SectionTitle title="Linked habits" />
+          <SectionTitle title={t('goal.linkedHabits')} />
           <Wrap>
             {habits.map((h) => (
-              <Card key={h.id} onPress={() => router.push({ pathname: '/habit/[id]', params: { id: h.id } })} style={{ padding: spacing.sm, paddingRight: spacing.lg }}>
+              <Card key={h.id} onPress={() => router.push({ pathname: '/habit/[id]', params: { id: h.id } })} style={{ padding: spacing.sm, paddingHorizontal: spacing.md }}>
                 <Row style={{ gap: spacing.sm }}>
                   <HabitIcon habit={h} size={32} />
                   <Text variant="label">{h.name}</Text>
@@ -120,7 +127,7 @@ export default function GoalDetailScreen() {
       ) : null}
 
       <Button
-        title={completed ? 'Reopen goal' : 'Mark goal as completed'}
+        title={completed ? t('goal.reopen') : t('goal.markCompleted')}
         icon={completed ? 'rotate-ccw' : 'award'}
         variant={completed ? 'secondary' : p.targetReached ? 'primary' : 'secondary'}
         onPress={() => setGoalCompleted(goal.id, !completed)}
