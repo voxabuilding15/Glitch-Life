@@ -5,7 +5,7 @@
     "scheme": "glitchlife",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#021024",
     "newArchEnabled": true,
@@ -21,10 +21,8 @@
     "android": {
       "package": "com.glitchlife.app",
       "adaptiveIcon": {
-        "backgroundColor": "#021024",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "backgroundColor": "#021024"
       },
       "predictiveBackGestureEnabled": false
     },

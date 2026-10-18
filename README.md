@@ -59,6 +59,6 @@ __tests__/              Unit tests for the domain + reducer
 
 * **Cloud sync & authentication** (Supabase) are not implemented; the app is fully local. If added, enable Row Level Security so every row is scoped to `auth.uid()` and keep keys in `EXPO_PUBLIC_*` env vars (anon key only — never a service key).
 * **Billing** is not implemented (see above).
-* **App icon / splash** are still the Expo template images; replace files in `assets/` before release.
+* **Splash image** (`assets/splash-icon.png`) is still the Expo template image; replace it before release. The app icon is in `assets/images/`.
 * Notifications on Android 13+/iOS prompt for permission the first time a timer or reminder needs it.
 * Bundle identifiers are `com.glitchlife.app`; change in `app.json` before publishing.
