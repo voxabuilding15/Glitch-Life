@@ -89,7 +89,7 @@ export default function OnboardingScreen() {
 
       <Wrap>
         {LANGUAGES.map((l) => (
-          <Chip key={l} label={`${LANGUAGE_NAMES[l].flag} ${LANGUAGE_NAMES[l].native}`} selected={lang === l} onPress={() => setLanguage(l)} />
+          <Chip key={l} label={LANGUAGE_NAMES[l].native} selected={lang === l} onPress={() => setLanguage(l)} />
         ))}
       </Wrap>
 

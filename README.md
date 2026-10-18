@@ -36,7 +36,7 @@ npm run typecheck    # tsc --noEmit (strict)
 | Onboarding | 3 optional steps (areas, main goal, suggested habits); skippable; leads to the first-habit prompt. |
 
 ### Languages & themes
-* **Languages:** English 🇬🇧, Français 🇫🇷, العربية 🇲🇦 (Arabic is fully right-to-left). Pick one in **You → Language** (or on the first onboarding screen). The first launch follows the device language when supported.
+* **Languages:** English, Français, العربية (Arabic is fully right-to-left). Pick one in **You → Language** (or on the first onboarding screen). The first launch follows the device language when supported.
 * **Themes:** Light, Dark or System default, in **You → Appearance → Theme**. Dark keeps the original navy brand palette; Light uses clean blue-white surfaces. All text/background pairs are tested for WCAG AA contrast.
 * Both choices apply instantly (no restart) and are stored locally under their own AsyncStorage key (`glitchlife.settings`), separate from app data.
 * **Adding/editing text:** edit `src/i18n/en.ts` (source of truth, typed keys), then `fr.ts` / `ar.ts` — TypeScript and `__tests__/i18n.test.ts` fail if a key, placeholder or Arabic plural form is missing. Plural forms use `key_one` / `key_other` (+ `_zero/_two/_few/_many` for Arabic).

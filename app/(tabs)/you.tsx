@@ -101,7 +101,6 @@ export default function YouScreen() {
                   borderWidth: selected ? 2 : 1, borderColor: selected ? colors.selected : colors.border, backgroundColor: selected ? colors.surfaceRaised : 'transparent',
                 }}
               >
-                <Text style={{ fontSize: 22 }}>{LANGUAGE_NAMES[l].flag}</Text>
                 {/* each language is always shown in its own script/direction */}
                 <Text variant="heading" style={{ flex: 1, textAlign: i18n.textAlign, writingDirection: l === 'ar' ? 'rtl' : 'ltr' }}>
                   {LANGUAGE_NAMES[l].native}

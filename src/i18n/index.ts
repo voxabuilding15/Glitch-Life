@@ -15,10 +15,10 @@ export type MessageKey = {
   [K in TranslationKey]: K extends `${infer B}_${PluralSuffix}` ? B : K;
 }[TranslationKey];
 
-export const LANGUAGE_NAMES: Record<Lang, { native: string; flag: string }> = {
-  en: { native: 'English', flag: '🇬🇧' },
-  fr: { native: 'Français', flag: '🇫🇷' },
-  ar: { native: 'العربية', flag: '🇲🇦' },
+export const LANGUAGE_NAMES: Record<Lang, { native: string }> = {
+  en: { native: 'English' },
+  fr: { native: 'Français' },
+  ar: { native: 'العربية' },
 };
 
 /** CLDR plural rules for the supported languages (no dependency on Intl.PluralRules support). */
